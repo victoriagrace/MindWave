@@ -1,0 +1,50 @@
+biscale(mn, mx, in) = mn + (0.5 * (in + 1)) * (mx - mn);
+
+scale(mn, mx, in) = mn + (in * (mx - mn));
+
+breathylead(freq, amt) = no.noise * amp : 
+fi.lowpass(4, 1000) :
+//seq(i, 2, fi.resonbp(ba.midikey2hz(freq), Q, 0.9)) :> _ * 0.3 :
+fi.resonhp(cutoff * jitter(cutoff), 10, 0.9) 
+with {
+	amp = 0.3;
+	Q = scale(1, 3, amt);
+	cutoff = scale(500, 4000, 1 - amt);
+	jitter(f) = biscale(0.9, 1.0, os.osc(f * 0.01));
+};
+ 
+lead_sound(nn, amt) = sawlead(nn) + lscale(0.1, amt) * breathylead(nn, amt)  : _ * 0.5;
+
+sawlead(freq) = 
+os.sawtooth(ba.midikey2hz(freq + (vib * vib_depth))) * 0.3 : ve.moog_vcf(0.4, 1000) 
+with {
+	vib_depth = biscale(0.01, 0.2, os.osc(1/12));
+	vib_rate = biscale(4, 6, os.osc(1/11));
+	vib = os.osc(vib_rate);
+};
+
+fosc(nn, mod, car, idx) = 
+	os.osc(car*freq + mod*freq*idx*os.osc(freq*mod))
+with {
+	freq = ba.midikey2hz(nn);
+};
+
+lfo(freq) = biscale(0, 1, os.osc(freq));
+
+chords(amt) = 
+fosc(60,1,1,3 * amt) * lfo(1/10) * scale(0.1, 1, lscale(0.1, amt)) + 
+fosc(59,1,0.999,1) * lfo(1/12)  * lscale(0.2, amt) + 
+fosc(55,1,1.001,1) * lfo(1/9) * scale(0.1, 1, lscale(0.3, amt)) + 
+fosc(62,2,1,1 * amt) * lfo(1/13) * lscale(0.4, amt) 
+: _ * 0.1;
+
+lscale(thresh, amt) = ((amt - thresh) / (1.0 - thresh)) * (amt > thresh);
+
+bass(amt) = 
+fosc(36, 1, 1.001, 8 * amt) * scale(amt, 1, lfo(1/11)) + 
+fosc(24, 1, 0.999, 8 * amt) * scale(amt, 1, lfo(1/11)) * 0.5 : _ * 0.2 * lscale(0.7, amt); 
+
+global_fx(amt, dry) =  dry + chords(amt) + bass(amt) <:_,_ : 
+re.zita_rev1_stereo(10, 350, 4000, 10, 20, 96000) : ba.selectn(2, 0) : (1 - amt) * dry + amt *  _;
+
+
