@@ -44,7 +44,27 @@ bass(amt) =
 fosc(36, 1, 1.001, 8 * amt) * scale(amt, 1, lfo(1/11)) + 
 fosc(24, 1, 0.999, 8 * amt) * scale(amt, 1, lfo(1/11)) * 0.5 : _ * 0.2 * lscale(0.7, amt); 
 
-global_fx(amt, dry) =  dry + chords(amt) + bass(amt) <:_,_ : 
+noise_sources = no.multinoise(5);
+
+rnd(n) = noise_sources : ba.selectn(5, n);
+
+trand(rnd, t) = rnd : ba.sAndH(t);
+
+maytrig(thresh, rnd, t) = trand(rnd, t) : (_ > thresh) * t ;
+
+pluckish(tempo, nn, ns) = 
+ba.beat(tempo * 2) : maytrig(0.9, ns) : ba.toggle : en.ar(0.001, 0.04) : _ * fosc(nn, 1, 1, 1);
+
+plucks = 
+pluckish(60, 64, rnd(0)) +
+pluckish(120, 67, rnd(1)) +
+pluckish(110, 71, rnd(2))
+
+: _ * 0.6 : echo ;
+
+echo = +~(de.fdelay(4 * ma.SR, 2 * ma.SR) * 0.8);
+
+global_fx(amt, dry) =  dry + chords(amt) + bass(amt) + plucks * lscale(0.3, amt) <:_,_ : 
 re.zita_rev1_stereo(10, 350, 4000, 10, 20, 96000) : ba.selectn(2, 0) : (1 - amt) * dry + amt *  _;
 
 
